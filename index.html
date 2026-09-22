@@ -437,7 +437,68 @@ function windowResized() {
 }
 
 
+
+// ============ 数据持久化 ============
+var LS_PREFIX = 'tree_';
+var LS_IMAGE_MAX = 4 * 1024 * 1024;
+
+function persistCfg(key, value) {
+  try { localStorage.setItem(LS_PREFIX + key, String(value)); }
+  catch (e) { console.warn('[persist] localStorage 写入失败（' + key + '）:', e.message); }
+}
+
+function restoreCfg() {
+  var keys = ['maxDepth', 'branchAngle', 'lengthRatio', 'trunkLength', 'trunkWidth', 'windStrength', 'growthSpeed', 'randomness', 'leafSize', 'leafDensity', 'c1', 'c2', 'bg'];
+  var count = 0;
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var v = localStorage.getItem(LS_PREFIX + k);
+    if (v === null) continue;
+    if (typeof cfg[k] === 'boolean') cfg[k] = (v === 'true');
+    else if (typeof cfg[k] === 'number') cfg[k] = parseFloat(v);
+    else if (typeof cfg[k] === 'string') cfg[k] = v;
+    count++;
+  }
+  if (count === 0) return false;
+  syncUIFromCfg();
+  console.log('[persist] 还原', count, '个参数');
+  return true;
+}
+
+function syncUIFromCfg() {
+  var $ = function(id) { return document.getElementById(id); };
+  // Sync all range inputs that match cfg keys
+  for (var k in cfg) {
+    var el = $(k);
+    if (el && el.type === 'range') {
+      el.value = cfg[k];
+      // trigger label update
+      if (el.oninput) el.oninput({target: el});
+      else el.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+  }
+  // Sync color inputs
+  for (var k2 in cfg) {
+    var el2 = $(k2);
+    if (el2 && el2.type === 'color') {
+      el2.value = cfg[k2];
+      el2.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+  }
+  // Sync text inputs
+  var ti = $('textInput');
+  if (ti && cfg.text !== undefined) { ti.value = cfg.text; ti.dispatchEvent(new Event('input', {bubbles: true})); }
+  var fn = $('fontName') || $('fontInput');
+  if (fn && cfg.fontName !== undefined) { 
+    if (fn.tagName === 'INPUT') { fn.value = cfg.fontName; }
+  }
+
+}
+
 function bindUI() {
+  // 恢复持久化设置
+  try { restoreCfg(); } catch(e) { console.warn('restoreCfg err:', e.message); }
+
   const $ = id => document.getElementById(id);
 
   const bindSlider = (id, key, valId, fmt) => {
@@ -474,9 +535,9 @@ function bindUI() {
   });
 
   
-  $('c1').addEventListener('input', e => { cfg.c1 = e.target.value; updateColors(); document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); });
-  $('c2').addEventListener('input', e => { cfg.c2 = e.target.value; updateColors(); document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); });
-  $('bg').addEventListener('input', e => { cfg.bg = e.target.value; });
+  $('c1').addEventListener('input', e => { try { persistCfg('c1', cfg.c1); } catch(e) {} cfg.c1 = e.target.value; updateColors(); document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); });
+  $('c2').addEventListener('input', e => { try { persistCfg('c2', cfg.c2); } catch(e) {} cfg.c2 = e.target.value; updateColors(); document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); });
+  $('bg').addEventListener('input', e => { try { persistCfg('bg', cfg.bg); } catch(e) {} cfg.bg = e.target.value; });
 
   
   $('clearBtn').addEventListener('click', () => {
